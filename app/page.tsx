@@ -267,7 +267,7 @@ export default function FeedPage() {
         .gridItem.bottomRight { border-bottom-right-radius: 11px; }
         .gridCover { width: 100%; aspect-ratio: 2 / 3; display: block; overflow: hidden; background: #f2f2ef; }
         .gridCover :global(img) { width: 100%; height: 100%; display: block; object-fit: cover; }
-        .gridRating { position: absolute; left: 7px; bottom: 7px; display: inline-flex; padding: 4px 6px 4px 5px; border-radius: 999px; background: rgba(255,255,255,.88); box-shadow: 0 1px 5px rgba(40,40,35,.08); backdrop-filter: blur(8px); }
+        .gridRating { position: absolute; right: 7px; bottom: 7px; display: inline-flex; padding: 4px 6px 4px 5px; border-radius: 999px; background: rgba(255,255,255,.88); box-shadow: 0 1px 5px rgba(40,40,35,.08); backdrop-filter: blur(8px); }
         .gridRating :global(.feedRating) { gap: 3px; }
         .gridRating :global(.feedRating svg) { width: 14px; height: 14px; }
         .gridRating :global(.feedRating b) { font-size: 9px; }
@@ -324,7 +324,7 @@ export default function FeedPage() {
           .viewTabs button { width: 66px; }
           .viewTabs button span { display: none; }
           .bookGrid { gap: 1.5px; padding: 1.5px; }
-          .gridRating { left: 5px; bottom: 5px; padding: 3px 5px 3px 4px; }
+          .gridRating { right: 5px; bottom: 5px; padding: 3px 5px 3px 4px; }
           .post { padding-top: 16px; }
           .feedCover { border-radius: 13px; }
         }
