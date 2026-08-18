@@ -20,15 +20,6 @@ type FeedBook = {
 
 type ViewMode = 'grid' | 'feed';
 
-function Stars({ rating, compact = false }: { rating?: number | null; compact?: boolean }) {
-  const value = typeof rating === 'number' ? Math.max(0, Math.min(5, rating)) : 0;
-  return (
-    <span className={`stars ${compact ? 'compact' : ''}`} aria-label={rating == null ? '평점 없음' : `평점 ${value}점`}>
-      {Array.from({ length: 5 }, (_, index) => <i key={index} className={index < value ? 'filled' : ''}>★</i>)}
-    </span>
-  );
-}
-
 function FeedRating({ rating }: { rating?: number | null }) {
   const value = typeof rating === 'number' ? Math.max(0, Math.min(5, rating)) : null;
   return (
@@ -178,12 +169,23 @@ export default function FeedPage() {
         <div className="state">{searchQuery.trim() ? '일치하는 책이 없습니다.' : '표시할 책이 없습니다.'}</div>
       ) : view === 'grid' ? (
         <section className="bookGrid">
-          {visibleBooks.map((book, index) => (
-            <button key={book.id ?? `${book.title}-${index}`} type="button" className="gridItem" onClick={() => openPost(book, index)}>
-              <span className="gridCover"><Cover book={book} /></span>
-              <span className="gridInfo"><b>{book.title ?? '제목 없음'}</b><Stars rating={book.rating} compact /></span>
-            </button>
-          ))}
+          {visibleBooks.map((book, index) => {
+            const lastIndex = visibleBooks.length - 1;
+            const lastRowStart = Math.floor(lastIndex / 3) * 3;
+            const cornerClasses = [
+              index === 0 ? 'topLeft' : '',
+              index === Math.min(2, lastIndex) ? 'topRight' : '',
+              index === lastRowStart ? 'bottomLeft' : '',
+              index === lastIndex ? 'bottomRight' : '',
+            ].filter(Boolean).join(' ');
+
+            return (
+              <button key={book.id ?? `${book.title}-${index}`} type="button" className={`gridItem ${cornerClasses}`} onClick={() => openPost(book, index)}>
+                <span className="gridCover"><Cover book={book} /></span>
+                <span className="gridRating"><FeedRating rating={book.rating} /></span>
+              </button>
+            );
+          })}
         </section>
       ) : (
         <section className="feedList">
@@ -257,17 +259,19 @@ export default function FeedPage() {
         @keyframes spin { to { transform: rotate(360deg); } }
         .state { min-height: 420px; display: grid; place-items: center; padding: 30px; color: #aaa9a4; font-size: 12px; font-weight: 700; text-align: center; }
         .state.error { color: #aa737b; }
-        .bookGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; padding-top: 1px; background: #fff; }
-        .gridItem { min-width: 0; padding: 0 0 11px; overflow: hidden; border: 0; background: #fff; text-align: left; cursor: pointer; }
-        .gridCover { width: 100%; aspect-ratio: 2 / 3; display: block; overflow: hidden; border-radius: 9px; background: #f2f2ef; }
+        .bookGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; padding: 2px; background: #fff; }
+        .gridItem { position: relative; min-width: 0; padding: 0; overflow: hidden; border: 0; border-radius: 0; background: #f2f2ef; text-align: left; cursor: pointer; }
+        .gridItem.topLeft { border-top-left-radius: 11px; }
+        .gridItem.topRight { border-top-right-radius: 11px; }
+        .gridItem.bottomLeft { border-bottom-left-radius: 11px; }
+        .gridItem.bottomRight { border-bottom-right-radius: 11px; }
+        .gridCover { width: 100%; aspect-ratio: 2 / 3; display: block; overflow: hidden; background: #f2f2ef; }
         .gridCover :global(img) { width: 100%; height: 100%; display: block; object-fit: cover; }
-        .gridInfo { min-width: 0; display: block; padding: 8px 9px 0; }
-        .gridInfo b { display: block; overflow: hidden; color: #4d4d49; font-size: 10px; font-weight: 750; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
-        :global(.stars) { display: inline-flex; align-items: center; gap: 1px; }
-        :global(.stars i) { color: #dfdfdc; font-family: Arial, sans-serif; font-size: 13px; font-style: normal; }
-        :global(.stars i.filled) { color: #ffc94a; }
-        :global(.stars.compact) { margin-top: 3px; }
-        :global(.stars.compact i) { font-size: 9px; }
+        .gridRating { position: absolute; left: 7px; bottom: 7px; display: inline-flex; padding: 4px 6px 4px 5px; border-radius: 999px; background: rgba(255,255,255,.88); box-shadow: 0 1px 5px rgba(40,40,35,.08); backdrop-filter: blur(8px); }
+        .gridRating :global(.feedRating) { gap: 3px; }
+        .gridRating :global(.feedRating svg) { width: 14px; height: 14px; }
+        .gridRating :global(.feedRating b) { font-size: 9px; }
+        .gridRating :global(.feedRating small) { font-size: 7px; }
         :global(.noCover) { width: 100%; height: 100%; display: grid; place-content: center; justify-items: center; gap: 7px; color: #b8b8b3; }
         :global(.noCover span) { font-size: 24px; }
         :global(.noCover b) { font-family: 'Courier New', monospace; font-size: 8px; letter-spacing: .16em; }
@@ -319,8 +323,8 @@ export default function FeedPage() {
           .viewTabs { gap: 12px; }
           .viewTabs button { width: 66px; }
           .viewTabs button span { display: none; }
-          .gridInfo { padding-inline: 6px; }
-          .gridInfo b { font-size: 9px; }
+          .bookGrid { gap: 1.5px; padding: 1.5px; }
+          .gridRating { left: 5px; bottom: 5px; padding: 3px 5px 3px 4px; }
           .post { padding-top: 16px; }
           .feedCover { border-radius: 13px; }
         }
