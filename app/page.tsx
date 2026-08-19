@@ -27,7 +27,7 @@ function FeedRating({ rating }: { rating?: number | null }) {
   return (
     <span className="feedRating" aria-label={value == null ? '평점 없음' : `평점 ${value}점`}>
       <Star size={17} strokeWidth={1.7} fill={value == null ? 'none' : 'currentColor'} />
-      <b>{value == null ? '—' : value.toFixed(value % 1 === 0 ? 0 : 1)}</b>
+      <b className={value == null ? 'empty' : undefined}>{value == null ? '–' : value.toFixed(value % 1 === 0 ? 0 : 1)}</b>
       <small>/ 5</small>
     </span>
   );
@@ -331,6 +331,7 @@ export default function FeedPage() {
         .gridRating :global(.feedRating) { gap: 3px; }
         .gridRating :global(.feedRating svg) { width: 14px; height: 14px; }
         .gridRating :global(.feedRating b) { font-size: 9px; }
+        .gridRating :global(.feedRating b.empty) { font-size: 8px; font-weight: 600; }
         .gridRating :global(.feedRating small) { font-size: 7px; }
         :global(.noCover) { width: 100%; height: 100%; display: grid; place-content: center; justify-items: center; gap: 7px; color: #b8b8b3; }
         :global(.noCover span) { font-size: 24px; }
@@ -368,6 +369,7 @@ export default function FeedPage() {
         .statusText.paused { color: #c9787e; }
         :global(.feedRating) { display: inline-flex; align-items: center; gap: 4px; color: #ffbd32; }
         :global(.feedRating b) { color: #5d5d58; font-size: 11px; font-weight: 800; }
+        :global(.feedRating b.empty) { font-size: 9px; font-weight: 600; }
         :global(.feedRating small) { margin-left: -2px; color: #aaa9a4; font-size: 8px; font-weight: 650; }
         .caption { display: grid; gap: 16px; margin-top: 14px; }
         :global(.reviewNotes) { display: grid; gap: 9px; }
