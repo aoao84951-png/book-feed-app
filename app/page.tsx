@@ -272,8 +272,8 @@ export default function FeedPage() {
         .viewTabs button span { font-size: 9px; font-weight: 750; }
         .viewTabs button.active { color: #555550; }
         .viewTabs button.active::after { content: ''; position: absolute; inset: auto 4px 0; height: 2px; border-radius: 2px 2px 0 0; background: #6f6f6a; }
-        .viewTabs .refresh { position: absolute; right: 10px; width: 36px; transition: color .18s ease, background .18s ease; }
-        .viewTabs .refresh.loading { border-radius: 50%; background: #f2f2ef; color: #666661; }
+        .viewTabs .refresh { position: absolute; right: 10px; width: 36px; transition: color .18s ease; }
+        .viewTabs .refresh.loading { color: #c98298; }
         .viewTabs .refresh.loading :global(svg) { animation: spin .8s linear infinite; }
         .viewTabs .refresh:disabled { cursor: wait; opacity: 1; }
         .viewTabs .searchToggle { position: absolute; left: 14px; width: 28px; height: 28px; top: 13px; border-radius: 50%; }
