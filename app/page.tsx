@@ -112,8 +112,9 @@ export default function FeedPage() {
 
   const visibleBooks = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase('ko-KR');
-    if (!query) return books;
-    return books.filter((book) => (book.title ?? '').toLocaleLowerCase('ko-KR').includes(query));
+    const feedBooks = books.filter((book) => (book.status ?? '').trim() !== '책바구니');
+    if (!query) return feedBooks;
+    return feedBooks.filter((book) => (book.title ?? '').toLocaleLowerCase('ko-KR').includes(query));
   }, [books, searchQuery]);
 
   useEffect(() => {
