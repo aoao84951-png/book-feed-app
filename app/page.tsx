@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Grid3X3, List, RefreshCw, Search, Star, X } from 'lucide-react';
 
 type FeedBook = {
@@ -92,8 +92,16 @@ export default function FeedPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [refreshNotice, setRefreshNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  const refreshNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function loadFeed() {
+  function showRefreshNotice(kind: 'success' | 'error', text: string) {
+    if (refreshNoticeTimer.current) clearTimeout(refreshNoticeTimer.current);
+    setRefreshNotice({ kind, text });
+    refreshNoticeTimer.current = setTimeout(() => setRefreshNotice(null), 2200);
+  }
+
+  async function loadFeed(notify = false) {
     try {
       setLoading(true);
       setError('');
@@ -101,14 +109,23 @@ export default function FeedPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error ?? '피드를 불러오지 못했습니다.');
       setBooks(Array.isArray(data?.items) ? data.items : []);
+      if (notify) showRefreshNotice('success', '최신 기록으로 업데이트했어요');
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : '피드를 불러오지 못했습니다.');
+      const message = caught instanceof Error ? caught.message : '피드를 불러오지 못했습니다.';
+      if (notify && books.length > 0) {
+        showRefreshNotice('error', '업데이트하지 못했어요');
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => { loadFeed(); }, []);
+  useEffect(() => () => {
+    if (refreshNoticeTimer.current) clearTimeout(refreshNoticeTimer.current);
+  }, []);
 
   const visibleBooks = useMemo(() => {
     const query = searchQuery.trim().toLocaleLowerCase('ko-KR');
@@ -141,10 +158,16 @@ export default function FeedPage() {
         <button type="button" className={view === 'feed' ? 'active' : ''} onClick={() => setView('feed')} aria-label="피드 보기">
           <List size={19} strokeWidth={1.8} /><span>피드</span>
         </button>
-        <button type="button" className="refresh" onClick={loadFeed} disabled={loading} aria-label="새로고침">
-          <RefreshCw size={14} className={loading ? 'spin' : ''} />
+        <button type="button" className={`refresh ${loading ? 'loading' : ''}`} onClick={() => loadFeed(true)} disabled={loading} aria-label={loading ? '업데이트 중' : '새로고침'}>
+          <RefreshCw size={14} />
         </button>
       </nav>
+
+      {refreshNotice && (
+        <div className={`refreshNotice ${refreshNotice.kind}`} role="status" aria-live="polite">
+          {refreshNotice.text}
+        </div>
+      )}
 
       {searchOpen && (
         <div className="searchBar">
@@ -249,15 +272,20 @@ export default function FeedPage() {
         .viewTabs button span { font-size: 9px; font-weight: 750; }
         .viewTabs button.active { color: #555550; }
         .viewTabs button.active::after { content: ''; position: absolute; inset: auto 4px 0; height: 2px; border-radius: 2px 2px 0 0; background: #6f6f6a; }
-        .viewTabs .refresh { position: absolute; right: 10px; width: 36px; }
+        .viewTabs .refresh { position: absolute; right: 10px; width: 36px; transition: color .18s ease, background .18s ease; }
+        .viewTabs .refresh.loading { border-radius: 50%; background: #f2f2ef; color: #666661; }
+        .viewTabs .refresh.loading :global(svg) { animation: spin .8s linear infinite; }
+        .viewTabs .refresh:disabled { cursor: wait; opacity: 1; }
         .viewTabs .searchToggle { position: absolute; left: 14px; width: 28px; height: 28px; top: 13px; border-radius: 50%; }
         .viewTabs .searchToggle.on { background: #f2f2ef; color: #666661; }
         .searchBar { position: sticky; top: 62px; z-index: 19; height: 34px; display: flex; align-items: center; gap: 7px; margin: 8px 14px; padding: 0 7px; border: 0; border-radius: 12px; background: rgba(244,244,242,.96); color: #999994; backdrop-filter: blur(12px); }
         .searchBar input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: #4d4d49; font: inherit; font-size: 10px; font-weight: 650; }
         .searchBar input::placeholder { color: #b1b1ac; }
         .searchBar button { width: 24px; height: 24px; display: grid; place-items: center; flex: 0 0 auto; padding: 0; border: 0; border-radius: 50%; background: rgba(255,255,255,.72); color: #999994; cursor: pointer; }
-        .spin { animation: spin .8s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
+        .refreshNotice { position: fixed; z-index: 30; top: 63px; left: 50%; padding: 7px 11px; border: 1px solid rgba(80,80,75,.07); border-radius: 999px; background: rgba(255,255,255,.94); box-shadow: 0 5px 18px rgba(45,45,40,.09); color: #656560; font-size: 9.5px; font-weight: 700; white-space: nowrap; backdrop-filter: blur(12px); transform: translateX(-50%); animation: noticeIn .2s ease-out both; }
+        .refreshNotice.error { color: #b36f79; }
+        @keyframes noticeIn { from { opacity: 0; transform: translate(-50%, -5px); } to { opacity: 1; transform: translate(-50%, 0); } }
         .state { min-height: 420px; display: grid; place-items: center; padding: 30px; color: #aaa9a4; font-size: 12px; font-weight: 700; text-align: center; }
         .state.error { color: #aa737b; }
         .bookGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; padding: 2px; background: #fff; }
