@@ -20,6 +20,8 @@ type FeedBook = {
 
 type ViewMode = 'grid' | 'feed';
 
+const FEED_CACHE_KEY = 'book-feed-cache-v1';
+
 function FeedRating({ rating }: { rating?: number | null }) {
   const value = typeof rating === 'number' ? Math.max(0, Math.min(5, rating)) : null;
   return (
@@ -94,6 +96,7 @@ export default function FeedPage() {
   const [error, setError] = useState('');
   const [refreshNotice, setRefreshNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const refreshNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasFeedRef = useRef(false);
 
   function showRefreshNotice(kind: 'success' | 'error', text: string) {
     if (refreshNoticeTimer.current) clearTimeout(refreshNoticeTimer.current);
@@ -105,15 +108,28 @@ export default function FeedPage() {
     try {
       setLoading(true);
       setError('');
-      const response = await fetch(`/api/bookshelves?ts=${Date.now()}`, { cache: 'no-store' });
+      const endpoint = notify ? `/api/bookshelves?ts=${Date.now()}` : '/api/bookshelves';
+      const response = await fetch(endpoint, notify ? { cache: 'no-store' } : undefined);
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error ?? '피드를 불러오지 못했습니다.');
-      setBooks(Array.isArray(data?.items) ? data.items : []);
+      const nextBooks = (Array.isArray(data?.items) ? data.items : []).filter(
+        (book: FeedBook) => (book.status ?? '').trim() !== '책바구니'
+      );
+      setBooks(nextBooks);
+      hasFeedRef.current = nextBooks.length > 0;
+      try {
+        window.localStorage.setItem(
+          FEED_CACHE_KEY,
+          JSON.stringify({ savedAt: Date.now(), items: nextBooks })
+        );
+      } catch {
+        // 캐시 저장이 불가능해도 피드는 정상적으로 사용한다.
+      }
       if (notify) showRefreshNotice('success', '최신 기록으로 업데이트했어요');
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : '피드를 불러오지 못했습니다.';
-      if (notify && books.length > 0) {
-        showRefreshNotice('error', '업데이트하지 못했어요');
+      if (hasFeedRef.current) {
+        if (notify) showRefreshNotice('error', '업데이트하지 못했어요');
       } else {
         setError(message);
       }
@@ -122,7 +138,22 @@ export default function FeedPage() {
     }
   }
 
-  useEffect(() => { loadFeed(); }, []);
+  useEffect(() => {
+    try {
+      const cached = window.localStorage.getItem(FEED_CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached) as { items?: FeedBook[] };
+        if (Array.isArray(parsed.items) && parsed.items.length > 0) {
+          setBooks(parsed.items);
+          hasFeedRef.current = true;
+        }
+      }
+    } catch {
+      window.localStorage.removeItem(FEED_CACHE_KEY);
+    }
+
+    loadFeed();
+  }, []);
   useEffect(() => () => {
     if (refreshNoticeTimer.current) clearTimeout(refreshNoticeTimer.current);
   }, []);

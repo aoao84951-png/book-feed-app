@@ -308,23 +308,28 @@ import {
   
   async function resolveCategoryRelations(
     notion: Client,
-    relationIds: string[]
+    relationIds: string[],
+    cache?: Map<string, Promise<RelationItem>>
   ): Promise<RelationItem[]> {
-    const results: RelationItem[] = [];
-  
-    for (const id of relationIds) {
-      try {
-        const page = await notion.pages.retrieve({ page_id: id });
-        const title = extractCategoryTitleFromRelationPage(page);
-        const key = toCategoryKey(title);
-  
-        results.push({ id, title, key });
-      } catch {
-        results.push({ id, title: null, key: null });
-      }
-    }
-  
-    return results;
+    return Promise.all(
+      relationIds.map((id) => {
+        const cached = cache?.get(id);
+        if (cached) return cached;
+
+        const pending = (async () => {
+          try {
+            const page = await notion.pages.retrieve({ page_id: id });
+            const title = extractCategoryTitleFromRelationPage(page);
+            return { id, title, key: toCategoryKey(title) };
+          } catch {
+            return { id, title: null, key: null };
+          }
+        })();
+
+        cache?.set(id, pending);
+        return pending;
+      })
+    );
   }
   
   function logOutgoingQueryUrl(dataSourceId: string) {
@@ -404,13 +409,18 @@ import {
     try {
       const resolvedDataSourceId = await resolveDataSourceId(notion, dataSourceId);
       const pages = await queryAllPages(notion, resolvedDataSourceId);
+      const visiblePages = pages.filter((page) => {
+        const properties = page.properties ?? {};
+        return (getStatusName(properties) ?? '').trim() !== '책바구니';
+      });
+      const categoryCache = new Map<string, Promise<RelationItem>>();
   
       const items = await Promise.all(
-        pages.map(async (page) => {
+        visiblePages.map(async (page) => {
           const properties = page.properties ?? {};
   
           const relationIds = getCategoryRelationIds(properties);
-          const relationCategories = await resolveCategoryRelations(notion, relationIds);
+          const relationCategories = await resolveCategoryRelations(notion, relationIds, categoryCache);
   
           const categoryKeys = Array.from(
             new Set(relationCategories.map((item) => item.key).filter(Boolean))
@@ -454,7 +464,14 @@ import {
         })
       );
   
-      return NextResponse.json({ items });
+      return NextResponse.json(
+        { items },
+        {
+          headers: {
+            'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+          },
+        }
+      );
     } catch (error) {
       if (APIResponseError.isAPIResponseError(error)) {
         return NextResponse.json(
