@@ -389,7 +389,7 @@ export default function FeedPage() {
         :global(.noCover span) { font-size: 24px; }
         :global(.noCover b) { font-family: 'Courier New', monospace; font-size: 8px; letter-spacing: .16em; }
         .feedList { width: min(100%, 520px); margin: 0 auto; }
-        .post { padding: 20px 0 26px; border-bottom: 1px solid #e8e8e5; }
+        .post { scroll-margin-top: 54px; padding: 20px 0 26px; border-bottom: 1px solid #e8e8e5; }
         .post:last-child { border-bottom: 0; }
         .postHead { min-height: 42px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 0 12px 11px; }
         .profileCover { width: 38px; min-width: 38px; max-width: 38px; height: 38px; min-height: 38px; max-height: 38px; aspect-ratio: 1; display: grid; place-items: center; flex: 0 0 38px; padding: 2px; overflow: hidden; border-radius: 999px; background: conic-gradient(from 205deg, #ffd33d, #ff8a22 20%, #ff334f 43%, #ef168c 68%, #a62cdb 84%, #ffd33d); }
