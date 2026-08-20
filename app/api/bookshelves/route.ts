@@ -7,6 +7,7 @@ import {
   import { NextResponse } from 'next/server';
   
   const NOTION_API_V1 = `${DEFAULT_BASE_URL}/v1`;
+  const DEFAULT_FEED_VIEW_ID = 'e480762e-cd02-4e4e-850f-8526fbd139b5';
   
   type TextNode = { plain_text?: string };
   
@@ -347,12 +348,6 @@ import {
       const response = await notion.dataSources.query({
         data_source_id: dataSourceId,
         page_size: 100,
-        sorts: [
-          {
-            timestamp: 'created_time',
-            direction: 'descending',
-          },
-        ],
         ...(cursor ? { start_cursor: cursor } : {}),
       });
   
@@ -367,6 +362,36 @@ import {
     }
   
     return rows;
+  }
+
+  async function queryAllViewPageIds(notion: Client, viewId: string): Promise<string[]> {
+    const firstPage = await notion.views.queries.create({
+      view_id: viewId,
+      page_size: 100,
+    });
+    const queryId = firstPage.id;
+    const pageIds = firstPage.results.map((page) => page.id);
+    let hasMore = firstPage.has_more;
+    let cursor = firstPage.next_cursor ?? undefined;
+
+    try {
+      while (hasMore && cursor) {
+        const response = await notion.views.queries.results({
+          view_id: viewId,
+          query_id: queryId,
+          start_cursor: cursor,
+          page_size: 100,
+        });
+
+        pageIds.push(...response.results.map((page) => page.id));
+        hasMore = response.has_more;
+        cursor = response.next_cursor ?? undefined;
+      }
+    } finally {
+      await notion.views.queries.delete({ view_id: viewId, query_id: queryId }).catch(() => undefined);
+    }
+
+    return pageIds;
   }
   
   async function resolveDataSourceId(notion: Client, rawId: string): Promise<string> {
@@ -396,6 +421,7 @@ import {
   export async function GET() {
     const notionToken = sanitizeIntegrationToken(process.env.NOTION_TOKEN);
     const dataSourceId = sanitizeEnvDatabaseId(process.env.NOTION_DATABASE_ID);
+    const feedViewId = process.env.NOTION_VIEW_ID?.trim() || DEFAULT_FEED_VIEW_ID;
   
     if (!notionToken || !dataSourceId) {
       return NextResponse.json(
@@ -409,7 +435,14 @@ import {
     try {
       const resolvedDataSourceId = await resolveDataSourceId(notion, dataSourceId);
       const pages = await queryAllPages(notion, resolvedDataSourceId);
-      const visiblePages = pages.filter((page) => {
+      const viewPageIds = await queryAllViewPageIds(notion, feedViewId);
+      const pagesById = new Map(
+        pages.flatMap((page) => (page.id ? [[page.id, page] as const] : []))
+      );
+      const orderedPages = viewPageIds
+        .map((id) => pagesById.get(id))
+        .filter((page): page is QueryPageResult => Boolean(page));
+      const visiblePages = orderedPages.filter((page) => {
         const properties = page.properties ?? {};
         return (getStatusName(properties) ?? '').trim() !== '책바구니';
       });
