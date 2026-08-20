@@ -7,7 +7,9 @@ import {
   import { NextResponse } from 'next/server';
   
   const NOTION_API_V1 = `${DEFAULT_BASE_URL}/v1`;
-  const DEFAULT_FEED_VIEW_ID = 'e480762e-cd02-4e4e-850f-8526fbd139b5';
+  // The linked BOOK SHELVES view used on the reading dashboard. This view has
+  // its own saved sort order, distinct from the source database's same-named view.
+  const DEFAULT_FEED_VIEW_ID = '70e23b05-623c-4d4d-beba-13cf4edb09fe';
   
   type TextNode = { plain_text?: string };
   
