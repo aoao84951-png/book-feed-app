@@ -248,6 +248,12 @@ import {
     const timestamp = Date.parse(purchaseDate);
     return Number.isNaN(timestamp) ? null : timestamp;
   }
+
+  function getCreatedTimeTimestamp(page: QueryPageResult) {
+    if (!page.created_time) return 0;
+    const timestamp = Date.parse(page.created_time);
+    return Number.isNaN(timestamp) ? 0 : timestamp;
+  }
   
   function getRatingText(properties: Record<string, NotionProperty>) {
     return propertyToText(findProperty(properties, ['평점', 'rating', '별점']));
@@ -433,10 +439,14 @@ import {
         .sort((left, right) => {
           const leftDate = getPurchaseDateTimestamp(left);
           const rightDate = getPurchaseDateTimestamp(right);
-          if (leftDate === null && rightDate === null) return 0;
+          if (leftDate === null && rightDate === null) {
+            return getCreatedTimeTimestamp(right) - getCreatedTimeTimestamp(left);
+          }
           if (leftDate === null) return 1;
           if (rightDate === null) return -1;
-          return rightDate - leftDate;
+          const purchaseDateDifference = rightDate - leftDate;
+          if (purchaseDateDifference !== 0) return purchaseDateDifference;
+          return getCreatedTimeTimestamp(right) - getCreatedTimeTimestamp(left);
         });
       const categoryCache = new Map<string, Promise<RelationItem>>();
   
