@@ -7,10 +7,6 @@ import {
   import { NextResponse } from 'next/server';
   
   const NOTION_API_V1 = `${DEFAULT_BASE_URL}/v1`;
-  // The linked BOOK SHELVES view used on the reading dashboard. This view has
-  // its own saved sort order, distinct from the source database's same-named view.
-  const DEFAULT_FEED_VIEW_ID = '70e23b05-623c-4d4d-beba-13cf4edb09fe';
-  
   type TextNode = { plain_text?: string };
   
   type NotionProperty = {
@@ -32,6 +28,7 @@ import {
       string?: string | null;
     };
     number?: number | null;
+    date?: { start?: string | null; end?: string | null } | null;
   };
   
   type QueryPageResult = {
@@ -238,6 +235,19 @@ import {
     if (statusProp?.type !== 'status') return null;
     return statusProp.status?.name ?? null;
   }
+
+  function getPurchaseDate(properties: Record<string, NotionProperty>) {
+    const purchaseDateProp = findProperty(properties, ['구매일', 'purchase date', 'purchased at']);
+    if (purchaseDateProp?.type !== 'date') return null;
+    return purchaseDateProp.date?.start ?? null;
+  }
+
+  function getPurchaseDateTimestamp(page: QueryPageResult) {
+    const purchaseDate = getPurchaseDate(page.properties ?? {});
+    if (!purchaseDate) return null;
+    const timestamp = Date.parse(purchaseDate);
+    return Number.isNaN(timestamp) ? null : timestamp;
+  }
   
   function getRatingText(properties: Record<string, NotionProperty>) {
     return propertyToText(findProperty(properties, ['평점', 'rating', '별점']));
@@ -376,36 +386,6 @@ import {
     return rows;
   }
 
-  async function queryAllViewPageIds(notion: Client, viewId: string): Promise<string[]> {
-    const firstPage = await notion.views.queries.create({
-      view_id: viewId,
-      page_size: 100,
-    });
-    const queryId = firstPage.id;
-    const pageIds = firstPage.results.map((page) => page.id);
-    let hasMore = firstPage.has_more;
-    let cursor = firstPage.next_cursor ?? undefined;
-
-    try {
-      while (hasMore && cursor) {
-        const response = await notion.views.queries.results({
-          view_id: viewId,
-          query_id: queryId,
-          start_cursor: cursor,
-          page_size: 100,
-        });
-
-        pageIds.push(...response.results.map((page) => page.id));
-        hasMore = response.has_more;
-        cursor = response.next_cursor ?? undefined;
-      }
-    } finally {
-      await notion.views.queries.delete({ view_id: viewId, query_id: queryId }).catch(() => undefined);
-    }
-
-    return pageIds;
-  }
-  
   async function resolveDataSourceId(notion: Client, rawId: string): Promise<string> {
     try {
       await notion.dataSources.query({ data_source_id: rawId, page_size: 1 });
@@ -433,8 +413,6 @@ import {
   export async function GET() {
     const notionToken = sanitizeIntegrationToken(process.env.NOTION_TOKEN);
     const dataSourceId = sanitizeEnvDatabaseId(process.env.NOTION_DATABASE_ID);
-    const feedViewId = process.env.NOTION_VIEW_ID?.trim() || DEFAULT_FEED_VIEW_ID;
-  
     if (!notionToken || !dataSourceId) {
       return NextResponse.json(
         { error: 'NOTION_TOKEN 또는 NOTION_DATABASE_ID가 없거나 올바르지 않습니다.' },
@@ -447,17 +425,19 @@ import {
     try {
       const resolvedDataSourceId = await resolveDataSourceId(notion, dataSourceId);
       const pages = await queryAllPages(notion, resolvedDataSourceId);
-      const viewPageIds = await queryAllViewPageIds(notion, feedViewId);
-      const pagesById = new Map(
-        pages.flatMap((page) => (page.id ? [[page.id, page] as const] : []))
-      );
-      const orderedPages = viewPageIds
-        .map((id) => pagesById.get(id))
-        .filter((page): page is QueryPageResult => Boolean(page));
-      const visiblePages = orderedPages.filter((page) => {
-        const properties = page.properties ?? {};
-        return (getStatusName(properties) ?? '').trim() !== '책바구니';
-      });
+      const visiblePages = pages
+        .filter((page) => {
+          const properties = page.properties ?? {};
+          return (getStatusName(properties) ?? '').trim() !== '책바구니';
+        })
+        .sort((left, right) => {
+          const leftDate = getPurchaseDateTimestamp(left);
+          const rightDate = getPurchaseDateTimestamp(right);
+          if (leftDate === null && rightDate === null) return 0;
+          if (leftDate === null) return 1;
+          if (rightDate === null) return -1;
+          return rightDate - leftDate;
+        });
       const categoryCache = new Map<string, Promise<RelationItem>>();
   
       const items = await Promise.all(
@@ -483,6 +463,7 @@ import {
             url: page.url ?? null,
             createdTime: page.created_time ?? null,
             lastEditedTime: page.last_edited_time ?? null,
+            purchaseDate: getPurchaseDate(properties),
             icon: getPageIcon(page),
   
             title: readTitleFromProperties(properties),
