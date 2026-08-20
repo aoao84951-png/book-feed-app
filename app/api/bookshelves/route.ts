@@ -39,6 +39,7 @@ import {
     id?: string;
     url?: string;
     created_time?: string;
+    last_edited_time?: string;
     icon?: {
       type?: 'emoji' | 'external' | 'file' | 'custom_emoji' | 'icon';
       emoji?: string;
@@ -215,6 +216,15 @@ import {
     if (first?.type === 'external') return first.external?.url ?? null;
   
     return null;
+  }
+
+  function getProxiedCoverUrl(page: QueryPageResult, properties: Record<string, NotionProperty>) {
+    const source = getCoverUrl(properties);
+    if (!source || !page.id) return source;
+
+    const params = new URLSearchParams({ pageId: page.id, source });
+    if (page.last_edited_time) params.set('v', page.last_edited_time);
+    return `/api/cover?${params.toString()}`;
   }
   
   function getAuthor(properties: Record<string, NotionProperty>) {
@@ -472,10 +482,11 @@ import {
             id: page.id ?? null,
             url: page.url ?? null,
             createdTime: page.created_time ?? null,
+            lastEditedTime: page.last_edited_time ?? null,
             icon: getPageIcon(page),
   
             title: readTitleFromProperties(properties),
-            cover: getCoverUrl(properties),
+            cover: getProxiedCoverUrl(page, properties),
             author: getAuthor(properties),
             status: getStatusName(properties),
   

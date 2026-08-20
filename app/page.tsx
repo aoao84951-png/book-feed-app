@@ -8,6 +8,7 @@ type FeedBook = {
   url?: string | null;
   title: string | null;
   cover: string | null;
+  lastEditedTime?: string | null;
   author: string | null;
   status: string | null;
   categoryLabels?: string[];
@@ -20,7 +21,29 @@ type FeedBook = {
 
 type ViewMode = 'grid' | 'feed';
 
-const FEED_CACHE_KEY = 'book-feed-cache-v1';
+const FEED_CACHE_KEY = 'book-feed-cache-v2';
+
+function normalizeCover(book: FeedBook): FeedBook {
+  if (!book.cover || book.cover.startsWith('/api/cover') || !book.id) return book;
+  const params = new URLSearchParams({ pageId: book.id, source: book.cover });
+  if (book.lastEditedTime) params.set('v', book.lastEditedTime);
+  return { ...book, cover: `/api/cover?${params.toString()}` };
+}
+
+function preserveCachedCovers(nextBooks: FeedBook[], currentBooks: FeedBook[]) {
+  const currentById = new Map(currentBooks.map((book) => [book.id, book]));
+  return nextBooks.map(normalizeCover).map((book) => {
+    const current = currentById.get(book.id);
+    if (
+      current?.cover?.startsWith('/api/cover') &&
+      current.lastEditedTime &&
+      current.lastEditedTime === book.lastEditedTime
+    ) {
+      return { ...book, cover: current.cover };
+    }
+    return book;
+  });
+}
 
 function FeedRating({ rating }: { rating?: number | null }) {
   const value = typeof rating === 'number' ? Math.max(0, Math.min(5, rating)) : null;
@@ -97,6 +120,7 @@ export default function FeedPage() {
   const [refreshNotice, setRefreshNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const refreshNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasFeedRef = useRef(false);
+  const booksRef = useRef<FeedBook[]>([]);
 
   function showRefreshNotice(kind: 'success' | 'error', text: string) {
     if (refreshNoticeTimer.current) clearTimeout(refreshNoticeTimer.current);
@@ -112,10 +136,12 @@ export default function FeedPage() {
       const response = await fetch(endpoint, notify ? { cache: 'no-store' } : undefined);
       const data = await response.json();
       if (!response.ok) throw new Error(data?.error ?? '피드를 불러오지 못했습니다.');
-      const nextBooks = (Array.isArray(data?.items) ? data.items : []).filter(
+      const incomingBooks = (Array.isArray(data?.items) ? data.items : []).filter(
         (book: FeedBook) => (book.status ?? '').trim() !== '책바구니'
       );
+      const nextBooks = preserveCachedCovers(incomingBooks, booksRef.current);
       setBooks(nextBooks);
+      booksRef.current = nextBooks;
       hasFeedRef.current = nextBooks.length > 0;
       try {
         window.localStorage.setItem(
@@ -140,11 +166,14 @@ export default function FeedPage() {
 
   useEffect(() => {
     try {
+      window.localStorage.removeItem('book-feed-cache-v1');
       const cached = window.localStorage.getItem(FEED_CACHE_KEY);
       if (cached) {
         const parsed = JSON.parse(cached) as { items?: FeedBook[] };
         if (Array.isArray(parsed.items) && parsed.items.length > 0) {
-          setBooks(parsed.items);
+          const cachedBooks = parsed.items.map(normalizeCover);
+          setBooks(cachedBooks);
+          booksRef.current = cachedBooks;
           hasFeedRef.current = true;
         }
       }
