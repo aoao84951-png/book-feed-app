@@ -121,6 +121,7 @@ export default function FeedPage() {
   const refreshNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasFeedRef = useRef(false);
   const booksRef = useRef<FeedBook[]>([]);
+  const gridScrollYRef = useRef(0);
 
   function showRefreshNotice(kind: 'success' | 'error', text: string) {
     if (refreshNoticeTimer.current) clearTimeout(refreshNoticeTimer.current);
@@ -201,8 +202,30 @@ export default function FeedPage() {
     });
   }, [view, pendingPostId]);
 
+  useEffect(() => {
+    if (view !== 'grid') return;
+
+    const firstFrame = requestAnimationFrame(() => {
+      window.scrollTo(0, gridScrollYRef.current);
+      requestAnimationFrame(() => window.scrollTo(0, gridScrollYRef.current));
+    });
+
+    return () => cancelAnimationFrame(firstFrame);
+  }, [view]);
+
   function openPost(book: FeedBook, index: number) {
+    gridScrollYRef.current = window.scrollY;
     setPendingPostId(`feed-post-${book.id ?? index}`);
+    setView('feed');
+  }
+
+  function showGrid() {
+    setView('grid');
+  }
+
+  function showFeed() {
+    if (view === 'grid') gridScrollYRef.current = window.scrollY;
+    setPendingPostId(null);
     setView('feed');
   }
 
@@ -212,10 +235,10 @@ export default function FeedPage() {
         <button type="button" className={`searchToggle ${searchOpen ? 'on' : ''}`} onClick={() => setSearchOpen((open) => !open)} aria-label="책 제목 검색">
           <Search size={15} />
         </button>
-        <button type="button" className={view === 'grid' ? 'active' : ''} onClick={() => setView('grid')} aria-label="표지 모아보기">
+        <button type="button" className={view === 'grid' ? 'active' : ''} onClick={showGrid} aria-label="표지 모아보기">
           <Grid3X3 size={18} strokeWidth={1.8} /><span>모아보기</span>
         </button>
-        <button type="button" className={view === 'feed' ? 'active' : ''} onClick={() => setView('feed')} aria-label="피드 보기">
+        <button type="button" className={view === 'feed' ? 'active' : ''} onClick={showFeed} aria-label="피드 보기">
           <List size={19} strokeWidth={1.8} /><span>피드</span>
         </button>
         <button type="button" className={`refresh ${loading ? 'loading' : ''}`} onClick={() => loadFeed(true)} disabled={loading} aria-label={loading ? '업데이트 중' : '새로고침'}>
